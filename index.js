@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const User = require("./Models/User");
 const Image = require("./Models/Image");
+const Place = require("./Models/Place");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 require("./passport");
@@ -85,15 +86,28 @@ app.post("/googe-o-auth", async function (req, res, next) {
           res.status(200).json({ status: true, token, userName: email });
         }
       } else {
-        console.log("email not verified");
         res.status(200).json({ status: false });
       }
     });
 });
+app.get("/users/:place", async (req, res) => {
+  Place.aggregate([{ $match: { place: req.params.place } }]).exec(
+    async function (err, places) {
+      if (err) console.log(err);
+      let users = await User.populate(places, {
+        path: "users",
+      });
+      res.status(200).json({ data: users[0] });
+    }
+  );
+});
+app.get("/places", async (req, res) => {
+  let places = await Place.find().sort({ createdAt: -1 }).exec();
+  res.status(200).json({ places });
+});
+
 app.post("/login", async function (req, res, next) {
   const { email, password } = req.body;
-
-  //Check If User Exists
   let foundUser = await User.findOne({ userName: email });
   if (foundUser && (await foundUser.matchPassword(password))) {
     const token = genToken(foundUser);
@@ -105,7 +119,6 @@ app.post("/login", async function (req, res, next) {
 });
 app.delete("/delete-img", async (req, res, next) => {
   let { imgKey, id } = req.query;
-  console.log(req.query);
   const deleteImg = await deleteImages(imgKey);
   if (deleteImg) {
     await Image.deleteOne({ _id: id });
@@ -116,10 +129,10 @@ app.delete("/delete-img", async (req, res, next) => {
   }
 });
 app.post("/register", async function (req, res, next) {
-  const { email, password } = req.body;
-  console.log(req.body);
+  const { email, password, place } = req.body;
   //Check If User Exists
   let foundUser = await User.findOne({ userName: email });
+
   if (foundUser) {
     return res.json({
       status: true,
@@ -132,19 +145,30 @@ app.post("/register", async function (req, res, next) {
   await newUser.save();
   // Generate JWT token
   const token = genToken(newUser);
-  console.log(token);
+  const doc = await Place.findOne({ place });
+  doc.users.addToSet(newUser._id);
+  await doc.save();
   res.status(200).json({ status: true, exist: false, token, userName: email });
 });
 
 app.get(
   "/",
   passport.authenticate("jwt", { session: false }),
-  async (req, res, next) => {
-    console.log("successfully authorized");
+  async (req, res) => {
     let imgs = await Image.find().sort({ createdAt: -1 }).exec();
     res.status(200).json({ images: imgs });
   }
 );
+
+// add places with postman after uncomment this route
+// app.post(
+//   "/add-place",
+//   async (req, res) => {
+//     const newPlace = new Place({ place: req.body.place });
+//     await newPlace.save();
+//     res.status(200).json({ status: true });
+//   }
+// );
 
 const userName = encodeURIComponent(process.env.MONGODBATLAS_USERNAME);
 const password = encodeURIComponent(process.env.MONGODBATLAS_PASSWORD);

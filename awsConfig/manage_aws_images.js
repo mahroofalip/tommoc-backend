@@ -6,7 +6,7 @@ const bucketName = process.env.AWS_S3_BUCKET_NAME
 const accessKeyId = process.env.AWS_ACCESS_KEY
 const secretAccessKey = process.env.AWS_SECRET_KEY
 const region = process.env.AWS_REGION
-console.log(bucketName,accessKeyId,secretAccessKey,region);
+
 const s3 = new S3({
   region,
   accessKeyId,
@@ -39,7 +39,7 @@ module.exports = {
 
 
     deleteImages : async (key) => {
-        console.log(key);
+       
         const params = {
             Bucket : bucketName,
             Key : key
@@ -48,7 +48,6 @@ module.exports = {
             if(err){
                 console.log(err);
             }else{
-                console.log(data);
                 return data
             }
         })
